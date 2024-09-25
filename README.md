@@ -33,9 +33,9 @@ docker logs jupyter-notebook
 ```
 3. Search for line:
 http://127.0.0.1:8888/lab?token=<token>
-4. Click on it in order to go to the jupyternotebook page.
+4. Click on it in order to go to the jupyter notebook page.
 5. Upload your notebook and run it.
-6. When you are done, download your new version of the notebook and stop and remove the container.
+6. When you are done, download your new version of the notebook, stop and remove the container.
 ```sh
 docker stop jupyter-notebook
 docker rm jupyter-notebook
