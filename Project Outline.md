@@ -27,7 +27,6 @@ Detailed project plan for analyzing the CDC Diabetes Health Indicators dataset
      - **Correlation Analysis**: Use correlation heatmaps to visualize relationships between the numeric features and the target variable.
      - **Univariate Analysis**: Visualize the distribution of individual features like `Age`, `BMI`, `Income` to detect trends in healthy vs. diabetic populations.
      - **Bivariate Analysis**: Analyze relationships between pairs of variables, such as `BMI` and `Diabetes_binary`, `HighChol` and `Diabetes_binary`, using box plots or scatter plots.
-     - **Multivariate Analysis**: Use pair plots or factor plots to assess how multiple features interact together, especially in relation to diabetes.
      - **Chi-square Tests**: For categorical variables, run chi-square tests to check their independence with the target variable.
 
 ### 4. **Feature Engineering and Dimensionality Reduction**
@@ -46,10 +45,9 @@ Detailed project plan for analyzing the CDC Diabetes Health Indicators dataset
      - **Logistic Regression**: Baseline for binary classification.
      - **Decision Trees**: Non-linear model to handle interactions between features.
      - **Random Forests**: Ensemble method to improve performance through multiple decision trees.
-     - **Gradient Boosting Machines (GBM)**: 
-       - Explore XGBoost or LightGBM for high accuracy and efficient training.
+     - **Gradient-Boosted Tree (GBT)**: 
+       - Explore Gradient-Boosted Tree for high accuracy and efficient training.
      - **Support Vector Machines (SVM)**: Linear and non-linear kernels to handle complex decision boundaries.
-     - **K-Nearest Neighbors (KNN)**: A simple algorithm that relies on feature similarity.
      - **Naive Bayes**: Useful for handling categorical variables and class imbalance.
      - **Neural Networks**:
        - Implement a simple feed-forward neural network to explore deep learning approaches.
