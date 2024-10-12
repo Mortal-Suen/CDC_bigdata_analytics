@@ -7,7 +7,8 @@ from sklearn.cluster import KMeans
 from pyspark.sql.functions import col, monotonically_increasing_id
 from pyspark.ml.feature import VectorAssembler, PCA
 from pyspark.ml.stat import Correlation
-from pyspark.ml.evaluation import MulticlassClassificationEvaluator
+from pyspark.ml.evaluation import MulticlassClassificationEvaluator, BinaryClassificationEvaluator
+from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
 
 def clean_data(X, y):
     # Remove duplicate rows
@@ -378,10 +379,24 @@ def test_train_split(X_pyspark, y_pyspark):
     test_data = assembler.transform(test_data)
     return train_data, test_data
 
-def fit_and_test(model, train_data, test_data):
+def fit_and_test(model, train_data, test_data, model_name, param_grid):
     results = {}
-    trained_model = model.fit(train_data)
-    predictions = trained_model.transform(test_data)
+
+    evaluator = BinaryClassificationEvaluator(labelCol="Diabetes_binary")
+    crossval = CrossValidator(
+        estimator=model,
+        estimatorParamMaps=param_grid,
+        evaluator=evaluator,
+        numFolds=3  # Use 3+ in practice
+    )
+    
+    # Fit the model
+    cv_model = crossval.fit(train_data) 
+
+    # Print the best parameters
+    print(f"Best parameters for {model_name}:")
+    print(cv_model.bestModel.extractParamMap())
+    predictions = cv_model.transform(test_data)
 
     accuracy_evaluator = MulticlassClassificationEvaluator(labelCol="Diabetes_binary", predictionCol="prediction", metricName="accuracy")
     results['accuracy'] = accuracy_evaluator.evaluate(predictions)
