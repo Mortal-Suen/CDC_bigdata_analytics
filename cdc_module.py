@@ -425,7 +425,7 @@ def plot_models_results(results):
         axes[i].set_title(f'{metric.capitalize()} for Different Models Across Datasets')
         axes[i].set_xticks(x + bar_width * (len(results[datasets[0]].keys()) - 1) / 2)  # Center the x-ticks
         axes[i].set_xticklabels(datasets)
-        axes[i].set_ylim(0, 1)  # Set y-axis limit for better visualization
+        axes[i].set_ylim(0.5,1)  # Set y-axis limit for better visualization
         axes[i].legend()
 
     # Adjust layout to prevent overlap
