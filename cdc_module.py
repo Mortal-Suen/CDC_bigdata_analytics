@@ -7,6 +7,7 @@ from sklearn.cluster import KMeans
 from pyspark.sql.functions import col, monotonically_increasing_id
 from pyspark.ml.feature import VectorAssembler, PCA
 from pyspark.ml.stat import Correlation
+from pyspark.ml.evaluation import MulticlassClassificationEvaluator
 
 def clean_data(X, y):
     # Remove duplicate rows
@@ -183,13 +184,13 @@ def select_corr_features(correlation_df):
 
     return selected_columns
 
-def pca_filter(columns_to_include, X_pyspark):
+def pca_filter(columns_to_include, X_pyspark, number_of_selected_features, add_composite_features=True):
     # Step 1: Assemble features into a vector column
     assembler = VectorAssembler(inputCols=columns_to_include, outputCol='features')
     data = assembler.transform(X_pyspark)
 
-    # Step 2: Apply PCA to select 6 principal components
-    pca = PCA(k=6, inputCol='features', outputCol='pca_features')
+    # Step 2: Apply PCA to select number_of_selected_features principal components
+    pca = PCA(k=number_of_selected_features, inputCol='features', outputCol='pca_features')
     pca_model = pca.fit(data)
     data_with_pca = pca_model.transform(data)
 
@@ -200,10 +201,12 @@ def pca_filter(columns_to_include, X_pyspark):
     # Take the absolute values of components and sum them
     contributions = [sum(abs(components[i])) for i in range(len(components[0]))]
 
-    # Step 5: Sort features by contributions and select the top 6
-    contribution_indices = sorted(range(len(contributions)), key=lambda i: contributions[i], reverse=True)[:6]
+    # Step 5: Sort features by contributions and select the top number_of_selected_features
+    contribution_indices = sorted(range(len(contributions)), key=lambda i: contributions[i], reverse=True)[:number_of_selected_features]
     selected_features = [columns_to_include[i] for i in contribution_indices]
-    merged_features = selected_features + ['Diet', 'cardiovascular', 'unhealthy_behavior', 'healthcare']
+    merged_features = selected_features 
+    if add_composite_features:
+        merged_features += ['Diet', 'cardiovascular', 'unhealthy_behavior', 'healthcare']
     print("Selected features based on PCA contributions:", selected_features)
 
     X_pyspark = X_pyspark.select(*merged_features)
@@ -365,4 +368,66 @@ def plot_eigenvalues(ev):
     plt.axhline(y=1, color='r', linestyle='--', label='Eigenvalue = 1')
     plt.legend()
     plt.grid(axis='y')
+    plt.show()
+
+def test_train_split(X_pyspark, y_pyspark):
+    data_pyspark = X_pyspark.join(y_pyspark)
+    train_data, test_data = data_pyspark.randomSplit([0.8, 0.2], seed=1234)
+    assembler = VectorAssembler(inputCols=X_pyspark.columns, outputCol="features")
+    train_data = assembler.transform(train_data)
+    test_data = assembler.transform(test_data)
+    return train_data, test_data
+
+def fit_and_test(model, train_data, test_data):
+    results = {}
+    trained_model = model.fit(train_data)
+    predictions = trained_model.transform(test_data)
+
+    accuracy_evaluator = MulticlassClassificationEvaluator(labelCol="Diabetes_binary", predictionCol="prediction", metricName="accuracy")
+    results['accuracy'] = accuracy_evaluator.evaluate(predictions)
+
+    f1_evaluator = MulticlassClassificationEvaluator(labelCol="Diabetes_binary", predictionCol="prediction", metricName="f1")
+    results['f1'] = f1_evaluator.evaluate(predictions)
+
+    recall_evaluator = MulticlassClassificationEvaluator(labelCol="Diabetes_binary", predictionCol="prediction", metricName="weightedRecall")
+    results['recall'] = recall_evaluator.evaluate(predictions)
+
+    precision_evaluator = MulticlassClassificationEvaluator(labelCol="Diabetes_binary", predictionCol="prediction", metricName="weightedPrecision")
+    results['precision'] = precision_evaluator.evaluate(predictions)
+    return results
+
+def plot_models_results(results):
+    datasets = list(results.keys())
+    metrics = ['accuracy', 'f1', 'recall', 'precision']
+
+    # Prepare data for plotting
+    bar_width = 0.1  # Width of bars
+    x = np.arange(len(datasets))  # the label locations
+
+    # Create subplots for each metric
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(15, 10))
+    axes = axes.flatten()  # Flatten the axes array for easy iteration
+
+    for i, metric in enumerate(metrics):
+        for model_name in results[datasets[0]].keys():  # Loop through models
+            # Gather the values for the current metric for the model
+            values = [results[dataset][model_name][metric] for dataset in datasets]
+            
+            # Create bars for the current metric and model
+            axes[i].bar(x + (list(results[datasets[0]].keys()).index(model_name) * bar_width), 
+                        values, 
+                        width=bar_width, 
+                        label=model_name)
+
+        # Add labels, title and customize ticks
+        axes[i].set_xlabel('Datasets')
+        axes[i].set_ylabel(metric.capitalize())
+        axes[i].set_title(f'{metric.capitalize()} for Different Models Across Datasets')
+        axes[i].set_xticks(x + bar_width * (len(results[datasets[0]].keys()) - 1) / 2)  # Center the x-ticks
+        axes[i].set_xticklabels(datasets)
+        axes[i].set_ylim(0, 1)  # Set y-axis limit for better visualization
+        axes[i].legend()
+
+    # Adjust layout to prevent overlap
+    plt.tight_layout()
     plt.show()
