@@ -3,7 +3,21 @@
 # Set the image and network names
 IMAGE="bitnami/spark:latest"
 NETWORK="spark-net"
-CONTAINERS=("spark-master" "spark-worker-1" "spark-worker-2")
+
+# Check if a number of workers is passed as an argument; default to 4 if not
+NUM_WORKERS=${1:-4}  # Use the first argument or default to 4
+CORES_PER_WORKER=2
+
+if ! [[ "$NUM_WORKERS" =~ ^[0-9]+$ ]]; then
+  echo "Invalid number of workers. Using default value of 4."
+  NUM_WORKERS=4
+fi
+
+# Create an array of container names based on the number of workers
+CONTAINERS=("spark-master")
+for i in $(seq 1 $NUM_WORKERS); do
+  CONTAINERS+=("spark-worker-$i")
+done
 
 # Check if the image is already pulled
 if [[ "$(docker images -q $IMAGE 2> /dev/null)" == "" ]]; then
@@ -34,8 +48,12 @@ docker run -d --name spark-master --network $NETWORK \
   -e SPARK_MODE=master -p 8080:8080 -p 7077:7077 $IMAGE
 
 # Run the Spark worker containers
-docker run -d --name spark-worker-1 --network $NETWORK \
-  -e SPARK_MODE=worker -e SPARK_MASTER_URL=spark://spark-master:7077 -p 8081:8081 $IMAGE
+for i in $(seq 1 $NUM_WORKERS); do
+  PORT=$((8080 + i))
+  docker run -d --name spark-worker-$i --network $NETWORK \
+    -e SPARK_MODE=worker -e SPARK_MASTER_URL=spark://spark-master:7077 \
+    -e SPARK_WORKER_CORES=$CORES_PER_WORKER \
+    -p $PORT:8081 $IMAGE
+done
 
-docker run -d --name spark-worker-2 --network $NETWORK \
-  -e SPARK_MODE=worker -e SPARK_MASTER_URL=spark://spark-master:7077 -p 8082:8082 $IMAGE
+echo "$NUM_WORKERS Spark worker(s) started."

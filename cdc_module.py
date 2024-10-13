@@ -387,15 +387,14 @@ def fit_and_test(model, train_data, test_data, model_name, param_grid):
         estimator=model,
         estimatorParamMaps=param_grid,
         evaluator=evaluator,
-        numFolds=3  # Use 3+ in practice
+        numFolds=3, parallelism=16
     )
     
-    # Fit the model
     cv_model = crossval.fit(train_data) 
 
-    # Print the best parameters
-    print(f"Best parameters for {model_name}:")
-    print(cv_model.bestModel.extractParamMap())
+    best_params = {param.name: value for param, value in cv_model.bestModel.extractParamMap().items() if param in param_grid[0].keys()}
+    print(f"Best parameters for {model_name}:", best_params)
+
     predictions = cv_model.transform(test_data)
 
     accuracy_evaluator = MulticlassClassificationEvaluator(labelCol="Diabetes_binary", predictionCol="prediction", metricName="accuracy")
@@ -411,7 +410,7 @@ def fit_and_test(model, train_data, test_data, model_name, param_grid):
     results['precision'] = precision_evaluator.evaluate(predictions)
     return results
 
-def plot_models_results(results):
+def plot_models_results(results, models_name_mapping):
     datasets = list(results.keys())
     metrics = ['accuracy', 'f1', 'recall', 'precision']
 
@@ -432,7 +431,7 @@ def plot_models_results(results):
             axes[i].bar(x + (list(results[datasets[0]].keys()).index(model_name) * bar_width), 
                         values, 
                         width=bar_width, 
-                        label=model_name)
+                        label=models_name_mapping[model_name])
 
         # Add labels, title and customize ticks
         axes[i].set_xlabel('Datasets')

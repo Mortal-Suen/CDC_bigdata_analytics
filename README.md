@@ -16,27 +16,27 @@ You can remove the Docker containers using this command.
 sudo ./remove_spark_cluster.sh
 ```
 
-## Run jupyter notebook
+## Run jupyter notebook with the Spark Cluster
 
-1. You need to run a docker container for the notebook.
+1. Run this command in order to get the ip adress of the spark master
 ```sh
-docker run --network spark-net -d -p 8888:8888 \
--e JUPYTER_ENABLE_LAB=yes \
--e SPARK_MASTER_URL=spark://spark-master:7077 \
---name jupyter-notebook \
-jupyter/pyspark-notebook
+sudo docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' spark-master
+```
 
+2. In the notebook, where the spark app is started, change 
+```python
+spark = SparkSession.builder \
+    .appName("CDC Diabetes Health Indicators") \
+    .master('local[16]') \
+    .config("spark.driver.memory", "16g")\
+    .getOrCreate()
 ```
-2. Run the following command.
-```sh
-docker logs jupyter-notebook
+to
+```python
+spark = SparkSession.builder \
+    .appName("CDC Diabetes Health Indicators") \
+    .master('spark://master_ip:7077') \
+    .config("spark.driver.memory", "16g")\
+    .getOrCreate()
 ```
-3. Search for line:
-http://127.0.0.1:8888/lab?token=<token>
-4. Click on it in order to go to the jupyter notebook page.
-5. Upload your notebook and run it.
-6. When you are done, download your new version of the notebook, stop and remove the container.
-```sh
-docker stop jupyter-notebook
-docker rm jupyter-notebook
-```
+where master_ip is the ip adress you got from the command above
