@@ -1,14 +1,19 @@
+import os
+import json
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
 import pyspark
+from time import time
 from sklearn.cluster import KMeans
 from pyspark.sql.functions import col, monotonically_increasing_id, rand
 from pyspark.ml.feature import VectorAssembler, PCA
 from pyspark.ml.stat import Correlation
 from pyspark.ml.evaluation import MulticlassClassificationEvaluator, BinaryClassificationEvaluator
 from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
+
+RESULTS_FILE_PATH = './results.json'
 
 def clean_data(X, y):
     # Remove duplicate rows
@@ -430,7 +435,6 @@ def fit_and_test(model, train_data, test_data, model_name, param_grid):
     cv_model = crossval.fit(train_data) 
 
     best_params = {param.name: value for param, value in cv_model.bestModel.extractParamMap().items() if param in param_grid[0].keys()}
-    print(f"Best parameters for {model_name}:", best_params)
 
     predictions = cv_model.transform(test_data)
 
@@ -445,6 +449,7 @@ def fit_and_test(model, train_data, test_data, model_name, param_grid):
 
     precision_evaluator = MulticlassClassificationEvaluator(labelCol="Diabetes_binary", predictionCol="prediction", metricName="weightedPrecision")
     results['precision'] = precision_evaluator.evaluate(predictions)
+    results['best_params'] = best_params
     return results
 
 def plot_models_results(results, models_name_mapping):
@@ -499,7 +504,7 @@ def balance_dataset(X_pyspark, y_pyspark):
 
     # Undersample the majority class (0s) to match the minority class (1s)
     majority_class = combined_df.filter(col('Diabetes_binary') == 0)
-    undersampled_majority = majority_class.sample(withReplacement=False, fraction=count_1 / count_0)
+    undersampled_majority = majority_class.sample(withReplacement=False, fraction=count_1 / count_0, seed=42)
 
     # Combine the undersampled majority class with the minority class (1s)
     minority_class = combined_df.filter(col('Diabetes_binary') == 1)
@@ -516,3 +521,52 @@ def balance_dataset(X_pyspark, y_pyspark):
     print(f"Balanced class distribution: class 0 - {count_0}; class 1 - {count_1}")
 
     return balanced_X, balanced_y
+
+def test_and_save_results(dataset_name, dataset, model_name, model, models_name_mapping, param_grids):
+    results = read_json_file()
+    if dataset_name not in results:
+        results[dataset_name] = {}
+    if model_name == 'mlp':
+        train_data,_ = dataset
+        features_number = len(train_data.columns) - 2
+        param_grids['mlp'] = (ParamGridBuilder()
+        .addGrid(model.layers, [[features_number, 50, 2], [features_number, 100, 2], [features_number, 25, 25, 2]])
+        .addGrid(model.stepSize, [0.01, 0.1])
+        .build())
+    if model_name in results[dataset_name]:
+        print(f'Training model {models_name_mapping[model_name]} on dataset {dataset_name}')
+        print(f'Accuracy:{results[dataset_name][model_name]["accuracy"]},\n\
+              Precision:{results[dataset_name][model_name]["precision"]},\n\
+              Recall:{results[dataset_name][model_name]["recall"]},\n\
+              F1 Score:{results[dataset_name][model_name]["f1"]},\n\
+              Time:{results[dataset_name][model_name]["time"]}seconds,\n\
+              Best Hyperparameters:{results[dataset_name][model_name]["best_params"]}')
+        return results
+    start = time()
+    print(f'Training model {models_name_mapping[model_name]} on dataset {dataset_name}')
+    results[dataset_name][model_name] = fit_and_test(model, *dataset, model_name, param_grids[model_name])
+    results[dataset_name][model_name]['time'] = time()-start
+    print(f'Accuracy:{results[dataset_name][model_name]["accuracy"]},\n\
+        Precision:{results[dataset_name][model_name]["precision"]},\n\
+        Recall:{results[dataset_name][model_name]["recall"]},\n\
+        F1 Score:{results[dataset_name][model_name]["f1"]},\n\
+        Time:{results[dataset_name][model_name]["time"]}seconds\n\
+        Best Hyperparameters:{results[dataset_name][model_name]["best_params"]}')
+    save_results(results)
+    return results
+
+def save_results(results):
+    with open(RESULTS_FILE_PATH, 'w') as file:
+        json.dump(results, file, indent=4)
+
+def read_json_file():
+    if os.path.exists(RESULTS_FILE_PATH):
+        try:
+            with open(RESULTS_FILE_PATH, 'r') as file:
+                data = json.load(file)
+                return data
+        except json.JSONDecodeError:
+            print(f"Error: {RESULTS_FILE_PATH} contains invalid JSON.")
+            return {}
+    else:
+        return {}
