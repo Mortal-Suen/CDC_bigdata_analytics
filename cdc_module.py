@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import pyspark
 from sklearn.cluster import KMeans
-from pyspark.sql.functions import col, monotonically_increasing_id
+from pyspark.sql.functions import col, monotonically_increasing_id, rand
 from pyspark.ml.feature import VectorAssembler, PCA
 from pyspark.ml.stat import Correlation
 from pyspark.ml.evaluation import MulticlassClassificationEvaluator, BinaryClassificationEvaluator
@@ -482,3 +482,37 @@ def plot_models_results(results, models_name_mapping):
     # Adjust layout to prevent overlap
     plt.tight_layout()
     plt.show()
+
+def balance_dataset(X_pyspark, y_pyspark):
+    # Add an ID column to align X_pyspark and y_pyspark
+    X_pyspark_with_id = X_pyspark.withColumn("id", monotonically_increasing_id())
+    y_pyspark_with_id = y_pyspark.withColumn("id", monotonically_increasing_id())
+
+    # Join X_pyspark and y_pyspark on the 'id' column
+    combined_df = X_pyspark_with_id.join(y_pyspark_with_id, "id").drop("id")
+
+    # Display original class distribution
+    original_counts = combined_df.groupBy('Diabetes_binary').count().collect()
+    count_0 = next(count['count'] for count in original_counts if count['Diabetes_binary'] == 0)
+    count_1 = next(count['count'] for count in original_counts if count['Diabetes_binary'] == 1)
+    print(f"Original class distribution: class 0 - {count_0}; class 1 - {count_1}")
+
+    # Undersample the majority class (0s) to match the minority class (1s)
+    majority_class = combined_df.filter(col('Diabetes_binary') == 0)
+    undersampled_majority = majority_class.sample(withReplacement=False, fraction=count_1 / count_0)
+
+    # Combine the undersampled majority class with the minority class (1s)
+    minority_class = combined_df.filter(col('Diabetes_binary') == 1)
+    balanced_df = undersampled_majority.union(minority_class)
+
+    # Split the combined DataFrame back into X and y
+    balanced_X = balanced_df.select(X_pyspark.columns)
+    balanced_y = balanced_df.select("Diabetes_binary")
+
+    # Display the balanced class distribution
+    balanced_counts = balanced_y.groupBy('Diabetes_binary').count().collect()
+    count_0 = next(count['count'] for count in balanced_counts if count['Diabetes_binary'] == 0)
+    count_1 = next(count['count'] for count in balanced_counts if count['Diabetes_binary'] == 1)
+    print(f"Balanced class distribution: class 0 - {count_0}; class 1 - {count_1}")
+
+    return balanced_X, balanced_y
