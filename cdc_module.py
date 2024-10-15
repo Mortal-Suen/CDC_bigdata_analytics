@@ -522,8 +522,8 @@ def balance_dataset(X_pyspark, y_pyspark):
 
     return balanced_X, balanced_y
 
-def test_and_save_results(dataset_name, dataset, model_name, model, models_name_mapping, param_grids):
-    results = read_json_file()
+def test_and_save_results(dataset_name, dataset, model_name, model, models_name_mapping, param_grids, file_name):
+    results = read_json_file(file_name)
     if dataset_name not in results:
         results[dataset_name] = {}
     if model_name == 'mlp':
@@ -552,21 +552,21 @@ def test_and_save_results(dataset_name, dataset, model_name, model, models_name_
         F1 Score:{results[dataset_name][model_name]["f1"]},\n\
         Time:{results[dataset_name][model_name]["time"]}seconds\n\
         Best Hyperparameters:{results[dataset_name][model_name]["best_params"]}')
-    save_results(results)
+    save_results(results, file_name)
     return results
 
-def save_results(results):
-    with open(RESULTS_FILE_PATH, 'w') as file:
+def save_results(results, file_name):
+    with open(file_name, 'w') as file:
         json.dump(results, file, indent=4)
 
-def read_json_file():
-    if os.path.exists(RESULTS_FILE_PATH):
+def read_json_file(file_name):
+    if os.path.exists(file_name):
         try:
-            with open(RESULTS_FILE_PATH, 'r') as file:
+            with open(file_name, 'r') as file:
                 data = json.load(file)
                 return data
         except json.JSONDecodeError:
-            print(f"Error: {RESULTS_FILE_PATH} contains invalid JSON.")
+            print(f"Error: {file_name} contains invalid JSON.")
             return {}
     else:
         return {}
