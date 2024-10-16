@@ -13,7 +13,6 @@ from pyspark.ml.stat import Correlation
 from pyspark.ml.evaluation import MulticlassClassificationEvaluator, BinaryClassificationEvaluator
 from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
 
-RESULTS_FILE_PATH = './results.json'
 
 def clean_data(X, y):
     # Remove duplicate rows
@@ -413,45 +412,6 @@ def plot_eigenvalues(ev):
     plt.grid(axis='y')
     plt.show
 
-def test_train_split(X_pyspark, y_pyspark):
-    data_pyspark = X_pyspark.join(y_pyspark)
-    train_data, test_data = data_pyspark.randomSplit([0.8, 0.2], seed=1234)
-    assembler = VectorAssembler(inputCols=X_pyspark.columns, outputCol="features")
-    train_data = assembler.transform(train_data)
-    test_data = assembler.transform(test_data)
-    return train_data, test_data
-
-def fit_and_test(model, train_data, test_data, model_name, param_grid):
-    results = {}
-
-    evaluator = BinaryClassificationEvaluator(labelCol="Diabetes_binary")
-    crossval = CrossValidator(
-        estimator=model,
-        estimatorParamMaps=param_grid,
-        evaluator=evaluator,
-        numFolds=3, parallelism=16
-    )
-    
-    cv_model = crossval.fit(train_data) 
-
-    best_params = {param.name: value for param, value in cv_model.bestModel.extractParamMap().items() if param in param_grid[0].keys()}
-
-    predictions = cv_model.transform(test_data)
-
-    accuracy_evaluator = MulticlassClassificationEvaluator(labelCol="Diabetes_binary", predictionCol="prediction", metricName="accuracy")
-    results['accuracy'] = accuracy_evaluator.evaluate(predictions)
-
-    f1_evaluator = MulticlassClassificationEvaluator(labelCol="Diabetes_binary", predictionCol="prediction", metricName="f1")
-    results['f1'] = f1_evaluator.evaluate(predictions)
-
-    recall_evaluator = MulticlassClassificationEvaluator(labelCol="Diabetes_binary", predictionCol="prediction", metricName="weightedRecall")
-    results['recall'] = recall_evaluator.evaluate(predictions)
-
-    precision_evaluator = MulticlassClassificationEvaluator(labelCol="Diabetes_binary", predictionCol="prediction", metricName="weightedPrecision")
-    results['precision'] = precision_evaluator.evaluate(predictions)
-    results['best_params'] = best_params
-    return results
-
 def plot_models_results(results, models_name_mapping):
     datasets = list(results.keys())
     metrics = ['accuracy', 'f1', 'recall', 'precision']
@@ -522,51 +482,4 @@ def balance_dataset(X_pyspark, y_pyspark):
 
     return balanced_X, balanced_y
 
-def test_and_save_results(dataset_name, dataset, model_name, model, models_name_mapping, param_grids, file_name):
-    results = read_json_file(file_name)
-    if dataset_name not in results:
-        results[dataset_name] = {}
-    if model_name == 'mlp':
-        train_data,_ = dataset
-        features_number = len(train_data.columns) - 2
-        param_grids['mlp'] = (ParamGridBuilder()
-        .addGrid(model.layers, [[features_number, 50, 2], [features_number, 100, 2], [features_number, 25, 25, 2]])
-        .addGrid(model.stepSize, [0.01, 0.1])
-        .build())
-    if model_name in results[dataset_name]:
-        print(f'Training model {models_name_mapping[model_name]} on dataset {dataset_name}')
-        print(f'Accuracy:{results[dataset_name][model_name]["accuracy"]},\n\
-              Precision:{results[dataset_name][model_name]["precision"]},\n\
-              Recall:{results[dataset_name][model_name]["recall"]},\n\
-              F1 Score:{results[dataset_name][model_name]["f1"]},\n\
-              Time:{results[dataset_name][model_name]["time"]}seconds,\n\
-              Best Hyperparameters:{results[dataset_name][model_name]["best_params"]}')
-        return results
-    start = time()
-    print(f'Training model {models_name_mapping[model_name]} on dataset {dataset_name}')
-    results[dataset_name][model_name] = fit_and_test(model, *dataset, model_name, param_grids[model_name])
-    results[dataset_name][model_name]['time'] = time()-start
-    print(f'Accuracy:{results[dataset_name][model_name]["accuracy"]},\n\
-        Precision:{results[dataset_name][model_name]["precision"]},\n\
-        Recall:{results[dataset_name][model_name]["recall"]},\n\
-        F1 Score:{results[dataset_name][model_name]["f1"]},\n\
-        Time:{results[dataset_name][model_name]["time"]}seconds\n\
-        Best Hyperparameters:{results[dataset_name][model_name]["best_params"]}')
-    save_results(results, file_name)
-    return results
 
-def save_results(results, file_name):
-    with open(file_name, 'w') as file:
-        json.dump(results, file, indent=4)
-
-def read_json_file(file_name):
-    if os.path.exists(file_name):
-        try:
-            with open(file_name, 'r') as file:
-                data = json.load(file)
-                return data
-        except json.JSONDecodeError:
-            print(f"Error: {file_name} contains invalid JSON.")
-            return {}
-    else:
-        return {}

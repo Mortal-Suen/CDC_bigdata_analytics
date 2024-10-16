@@ -5,15 +5,28 @@ We created a Spark cluster with a Master node and two Worker nodes using Docker 
 ```sh
 sudo ./run_spark_cluster.sh
 ```
+or
+```sh
+sudo ./run_spark_cluster.sh <number_of_workers>
+```
+The default numbe rof workers is 4.
 You can validate that the cluster is running by visiting the web UI of the Spark Master on [localhost:8080](http://localhost:8080/). 
 
 You can stop the cluster using this command.
 ```sh
 sudo ./stop_spark_cluster.sh
 ```
+or
+```sh
+sudo ./stop_spark_cluster.sh <number_of_workers>
+```
 You can remove the Docker containers using this command.
 ```sh
 sudo ./remove_spark_cluster.sh
+```
+or
+```sh
+sudo ./remove_spark_cluster.sh <number_of_workers>
 ```
 
 ## Run jupyter notebook with the Spark Cluster
