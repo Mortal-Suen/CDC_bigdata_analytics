@@ -412,22 +412,22 @@ def plot_eigenvalues(ev):
     plt.grid(axis='y')
     plt.show
 
+
 def plot_models_results(results, models_name_mapping):
     datasets = list(results.keys())
     metrics = ['accuracy', 'f1', 'recall', 'precision']
 
-    # Prepare data for plotting
-    bar_width = 0.1  # Width of bars
-    x = np.arange(len(datasets))  # the label locations
+    bar_width = 0.1 
+    x = np.arange(len(datasets))  
 
-    # Create subplots for each metric
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(15, 10))
-    axes = axes.flatten()  # Flatten the axes array for easy iteration
+    axes = axes.flatten()  
 
     for i, metric in enumerate(metrics):
-        for model_name in results[datasets[0]].keys():  # Loop through models
-            # Gather the values for the current metric for the model
+        all_values = []
+        for model_name in results[datasets[0]].keys():  
             values = [results[dataset][model_name][metric] for dataset in datasets]
+            all_values.extend(values)  
             
             # Create bars for the current metric and model
             axes[i].bar(x + (list(results[datasets[0]].keys()).index(model_name) * bar_width), 
@@ -435,18 +435,19 @@ def plot_models_results(results, models_name_mapping):
                         width=bar_width, 
                         label=models_name_mapping[model_name])
 
-        # Add labels, title and customize ticks
+        min_value = np.min(all_values)
+        max_value = np.max(all_values)
+        axes[i].set_ylim(min_value * 0.95, max_value * 1.05)  # Add padding around limits
+
         axes[i].set_xlabel('Datasets')
         axes[i].set_ylabel(metric.capitalize())
         axes[i].set_title(f'{metric.capitalize()} for Different Models Across Datasets')
-        axes[i].set_xticks(x + bar_width * (len(results[datasets[0]].keys()) - 1) / 2)  # Center the x-ticks
         axes[i].set_xticklabels(datasets)
-        axes[i].set_ylim(0.5,1)  # Set y-axis limit for better visualization
         axes[i].legend()
 
-    # Adjust layout to prevent overlap
     plt.tight_layout()
     plt.show()
+
 
 def balance_dataset(X_pyspark, y_pyspark):
     # Add an ID column to align X_pyspark and y_pyspark
