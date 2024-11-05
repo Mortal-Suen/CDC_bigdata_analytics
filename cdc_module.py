@@ -442,9 +442,11 @@ def plot_models_results(results, models_name_mapping):
         axes[i].set_xlabel('Datasets')
         axes[i].set_ylabel(metric.capitalize())
         axes[i].set_title(f'{metric.capitalize()} for Different Models Across Datasets')
-        axes[i].set_xticklabels(datasets)
+        
+        axes[i].set_xticks(x + bar_width * (len(results[datasets[0]].keys()) + 5) / 2)
+        axes[i].set_xticklabels(datasets, rotation=0, ha="right")
         axes[i].legend()
-
+        axes[i].legend(framealpha=0.3)  
     plt.tight_layout()
     plt.show()
 
