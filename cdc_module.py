@@ -413,8 +413,9 @@ def plot_eigenvalues(ev):
     plt.show
 
 
-def plot_models_results(results, models_name_mapping):
-    datasets = list(results.keys())
+def plot_models_results(results, models_name_mapping, datasets=None, message=None):
+    datasets = datasets if datasets else list(results.keys())
+    message = message if message else 'for Different Models Across Datasets'
     metrics = ['accuracy', 'f1', 'recall', 'precision']
 
     bar_width = 0.1 
@@ -441,7 +442,7 @@ def plot_models_results(results, models_name_mapping):
 
         axes[i].set_xlabel('Datasets')
         axes[i].set_ylabel(metric.capitalize())
-        axes[i].set_title(f'{metric.capitalize()} for Different Models Across Datasets')
+        axes[i].set_title(f'{metric.capitalize()} {message}')
         
         axes[i].set_xticks(x + bar_width * (len(results[datasets[0]].keys()) + 5) / 2)
         axes[i].set_xticklabels(datasets, rotation=0, ha="right")
@@ -450,6 +451,39 @@ def plot_models_results(results, models_name_mapping):
     plt.tight_layout()
     plt.show()
 
+
+def plot_all_results(all_results, models, metrics, feature_methods, model_names_mapping, sampling_methods):
+    fig, axes = plt.subplots(nrows=len(metrics), ncols=len(feature_methods), figsize=(24, 20))
+    axes = axes.flatten()
+
+    bar_width = 0.25
+    x = np.arange(len(models))  
+
+    for i, metric in enumerate(metrics):
+        for j, feature_method in enumerate(feature_methods):
+            all_values = []
+            for k, sampling_method in enumerate(sampling_methods):
+                results = all_results[sampling_method]
+                metric_values = [results[feature_method][model][metric] for model in models]
+                all_values.extend(metric_values)
+                axes[i * len(feature_methods) + j].bar(
+                    x + k * bar_width, metric_values, width=bar_width, label=sampling_method
+                )
+            
+            ax = axes[i * len(feature_methods) + j]
+            ax.set_xticks(x + bar_width) 
+            ax.set_xticklabels([model_names_mapping[model] for model in models], rotation=45, ha='right')
+            ax.set_xlabel("Models")
+            ax.set_ylabel(metric.capitalize())
+            ax.set_title(f'{metric.capitalize()} - {feature_method.replace("_", " ").title()}')
+            ax.legend(title="Sampling Strategy", framealpha=0.5)  
+            
+            min_value = np.min(all_values)
+            max_value = np.max(all_values)
+            ax.set_ylim(min_value * 0.95, max_value * 1.05)
+
+    plt.tight_layout()
+    plt.show()
 
 def balance_dataset(X_pyspark, y_pyspark):
     # Add an ID column to align X_pyspark and y_pyspark
